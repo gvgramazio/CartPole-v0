@@ -12,7 +12,8 @@ class DQNAgent:
         epsilon = 0.9,
         gamma = 0.9,
         target_replace_iter = 100,
-        memory_capacity = 2000
+        memory_capacity = 2000,
+        output_graph = False
         ):
         ''' Hyper parameters '''
         self.n_actions = n_actions
@@ -31,10 +32,10 @@ class DQNAgent:
         self.memory = np.zeros((memory_capacity, n_states * 2 + 2))
 
         ''' Tensorflow placeholders '''
-        self.state = tf.placeholder(tf.float32, [None, n_states])
-        self.action = tf.placeholder(tf.int32, [None, ])
-        self.reward = tf.placeholder(tf.float32, [None, ])
-        self.state_ = tf.placeholder(tf.float32, [None, n_states])
+        self.state = tf.placeholder(tf.float32, [None, n_states], name='state')
+        self.action = tf.placeholder(tf.int32, [None, ], name='action')
+        self.reward = tf.placeholder(tf.float32, [None, ], name='reward')
+        self.state_ = tf.placeholder(tf.float32, [None, n_states], name='state_')
 
         # Set seeds
         tf.set_random_seed(1)
@@ -57,6 +58,13 @@ class DQNAgent:
         self.train_op = tf.train.AdamOptimizer(self.learning_rate).minimize(loss)
 
         self.sess = tf.Session()
+
+        if output_graph:
+            # $ tensorboard --logdir=logs
+            tf.summary.scalar('loss', loss)
+            self.summary_op = tf.summary.merge_all()
+            self.writer = tf.summary.FileWriter("logs/", self.sess.graph)
+
         self.sess.run(tf.global_variables_initializer())
 
     def choose_action(self, s):
@@ -97,7 +105,9 @@ class DQNAgent:
         b_a = b_memory[:, self.n_states].astype(int)
         b_r = b_memory[:, self.n_states+1]
         b_s_ = b_memory[:, -self.n_states:]
-        self.sess.run(self.train_op, {self.state: b_s, self.action: b_a, self.reward: b_r, self.state_: b_s_})
+        #self.sess.run(self.train_op, {self.state: b_s, self.action: b_a, self.reward: b_r, self.state_: b_s_})
+        _, summary = self.sess.run([self.train_op, self.summary_op], {self.state: b_s, self.action: b_a, self.reward: b_r, self.state_: b_s_})
+        self.writer.add_summary(summary, self.learning_step_counter)
 
     def show_parameters(self):
         ''' Helper function to show the hyper parameters '''

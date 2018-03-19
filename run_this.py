@@ -30,7 +30,8 @@ if __name__ == "__main__":
         epsilon = 0.9,
         gamma = 0.9,
         target_replace_iter = 100,
-        memory_capacity = 2000
+        memory_capacity = 2000,
+        output_graph = True
     )
 
     for i_episode in range(400):
