@@ -57,14 +57,14 @@ class DQNAgent:
             self.replace_target_op = [tf.assign(t, e) for t, e in zip(t_params, e_params)]
 
         with tf.variable_scope('q_target'):
-            q_target = self.reward + self.gamma * tf.reduce_max(self.q_next, axis=1)    # shape=(None, )
+            self.q_target = self.reward + self.gamma * tf.reduce_max(self.q_next, axis=1)    # shape=(None, )
 
         with tf.variable_scope('q_eval'):
             a_indices = tf.stack([tf.range(tf.shape(self.action)[0], dtype=tf.int32), self.action], axis=1)
             q_eval_wrt_a = tf.gather_nd(params=self.q, indices=a_indices)                    # shape=(None, )
 
         with tf.variable_scope('loss'):
-            loss = tf.reduce_mean(tf.squared_difference(q_target, q_eval_wrt_a))
+            loss = tf.reduce_mean(tf.squared_difference(self.q_target, q_eval_wrt_a))
 
         with tf.variable_scope('train'):
             self.train_op = tf.train.AdamOptimizer(self.learning_rate).minimize(loss)
@@ -89,8 +89,8 @@ class DQNAgent:
             action = np.random.randint(0, self.n_actions)
         return action
 
-    def store_transition(self, s, a, r, s_):
-        self.D.append((s, a, r, s_))
+    def store_transition(self, observation, action, reward, observation_, done):
+        self.D.append((observation, action, reward, observation_, done))
 
     def update_target(self):
         if not hasattr(self, 'learning_step_counter'):
@@ -110,12 +110,21 @@ class DQNAgent:
         batch_action = deque(maxlen=batch_size)
         batch_reward = deque(maxlen=batch_size)
         batch_observation_ = deque(maxlen=batch_size)
+        batch_q_target = deque(maxlen=batch_size)
+        batch_done = deque(maxlen=batch_size)
         for j in batch_indeces:
-            observation_j, action_j, reward_j, observation_j_ = self.D[j]
+            observation_j, action_j, reward_j, observation_j_, done_j = self.D[j]
             batch_observation.append(observation_j)
             batch_action.append(action_j)
             batch_reward.append(reward_j)
             batch_observation_.append(observation_j_)
+            batch_done.append(done_j)
+        batch_q_target = self.sess.run(self.q_target, {
+            self.observation_: batch_observation,
+            self.reward: batch_reward})
+        for j in range(0,len(batch_done)):
+            if batch_done[j]:
+                batch_q_target[j] = batch_reward[j]
 
         _, summary = self.sess.run([self.train_op, self.summary_op], {
             self.observation: batch_observation,

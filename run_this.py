@@ -59,7 +59,7 @@ if __name__ == "__main__":
             score += reward
 
             # Store transition
-            agent.store_transition(observation, action, reward, observation_)
+            agent.store_transition(observation, action, reward, observation_, done)
 
             # Learn from experience
             agent.learn()
