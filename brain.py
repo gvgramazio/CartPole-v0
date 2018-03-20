@@ -41,21 +41,33 @@ class DQNAgent:
         tf.set_random_seed(1)
         np.random.seed(1)
 
-        with tf.variable_scope('q'):        # evaluation network
-            l_eval = tf.layers.dense(self.observation, 10, tf.nn.relu, kernel_initializer=tf.random_normal_initializer(0, 0.1))
-            self.q = tf.layers.dense(l_eval, n_actions, kernel_initializer=tf.random_normal_initializer(0, 0.1))
+        kernel_initializer, bias_initializer = tf.random_normal_initializer(0, 0.3), tf.constant_initializer(0.1)
 
-        with tf.variable_scope('q_next'):   # target network, not to train
-            l_target = tf.layers.dense(self.observation_, 10, tf.nn.relu, trainable=False)
-            self.q_next = tf.layers.dense(l_target, n_actions, trainable=False)
+        with tf.variable_scope('eval_net'):        # evaluation network
+            l_eval = tf.layers.dense(self.observation, 10, tf.nn.relu, kernel_initializer=kernel_initializer, bias_initializer=bias_initializer, name='eval_layer1')
+            self.q = tf.layers.dense(l_eval, n_actions, kernel_initializer=kernel_initializer, bias_initializer=bias_initializer, name='eval_layer2')
 
-        q_target = self.reward + self.gamma * tf.reduce_max(self.q_next, axis=1)    # shape=(None, )
+        with tf.variable_scope('target_net'):   # target network, not to train
+            l_target = tf.layers.dense(self.observation_, 10, tf.nn.relu, trainable=False, name='target_layer1')
+            self.q_next = tf.layers.dense(l_target, n_actions, trainable=False, name='target_layer2')
 
-        a_indices = tf.stack([tf.range(tf.shape(self.action)[0], dtype=tf.int32), self.action], axis=1)
-        q_wrt_a = tf.gather_nd(params=self.q, indices=a_indices)                    # shape=(None, )
+        with tf.variable_scope('target_replacement'):
+            t_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='target_net')
+            e_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='eval_net')
+            self.replace_target_op = [tf.assign(t, e) for t, e in zip(t_params, e_params)]
 
-        loss = tf.reduce_mean(tf.squared_difference(q_target, q_wrt_a))
-        self.train_op = tf.train.AdamOptimizer(self.learning_rate).minimize(loss)
+        with tf.variable_scope('q_target'):
+            q_target = self.reward + self.gamma * tf.reduce_max(self.q_next, axis=1)    # shape=(None, )
+
+        with tf.variable_scope('q_eval'):
+            a_indices = tf.stack([tf.range(tf.shape(self.action)[0], dtype=tf.int32), self.action], axis=1)
+            q_eval_wrt_a = tf.gather_nd(params=self.q, indices=a_indices)                    # shape=(None, )
+
+        with tf.variable_scope('loss'):
+            loss = tf.reduce_mean(tf.squared_difference(q_target, q_eval_wrt_a))
+
+        with tf.variable_scope('train'):
+            self.train_op = tf.train.AdamOptimizer(self.learning_rate).minimize(loss)
 
         self.sess = tf.Session()
 
@@ -85,9 +97,7 @@ class DQNAgent:
             self.learning_step_counter = 0
 
         if self.learning_step_counter % self.target_replace_iter == 0:
-            t_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_next')
-            e_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q')
-            self.sess.run([tf.assign(t, e) for t, e in zip(t_params, e_params)])
+            self.sess.run(self.replace_target_op)
         self.learning_step_counter += 1
 
     def learn(self):
