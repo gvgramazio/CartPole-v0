@@ -80,18 +80,20 @@ class DQNAgent:
     def store_transition(self, s, a, r, s_):
         self.D.append((s, a, r, s_))
 
-    def learn(self):
+    def update_target(self):
         if not hasattr(self, 'learning_step_counter'):
             self.learning_step_counter = 0
 
-        # Update target net
         if self.learning_step_counter % self.target_replace_iter == 0:
             t_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q_next')
             e_params = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='q')
             self.sess.run([tf.assign(t, e) for t, e in zip(t_params, e_params)])
         self.learning_step_counter += 1
 
-        # Learning
+    def learn(self):
+        # Update target net
+        self.update_target()
+
         batch_size = min(len(self.D), self.batch_size)
         batch_indeces = np.random.randint(0, len(self.D), batch_size)
         batch_observation = deque(maxlen=batch_size)
@@ -105,7 +107,11 @@ class DQNAgent:
             batch_reward.append(reward_j)
             batch_observation_.append(observation_j_)
 
-        _, summary = self.sess.run([self.train_op, self.summary_op], {self.observation: batch_observation, self.action: batch_action, self.reward: batch_reward, self.observation_: batch_observation_})
+        _, summary = self.sess.run([self.train_op, self.summary_op], {
+            self.observation: batch_observation,
+            self.action: batch_action,
+            self.reward: batch_reward,
+            self.observation_: batch_observation_})
         self.writer.add_summary(summary, self.learning_step_counter)
 
     def show_parameters(self):
