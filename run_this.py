@@ -24,7 +24,7 @@ if __name__ == "__main__":
     # New agent
     agent = DQNAgent(
         n_actions = env.action_space.n,
-        n_states = env.observation_space.shape[0],
+        space_shape = env.observation_space.shape[0],
         batch_size = 32,
         learning_rate = 0.01,
         epsilon = 0.9,
@@ -50,7 +50,6 @@ if __name__ == "__main__":
             observation_, reward, done, info = env.step(action)
 
             # Modify the reward
-            #reward = modify_reward(observation_, env.x_threshold, env.theta_threshold_radians)
             reward = modify_reward(observation_)
 
             ''' The score for CartPole-v0 is the cumulative sum of the rewards
