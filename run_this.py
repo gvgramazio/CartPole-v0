@@ -30,7 +30,7 @@ if __name__ == "__main__":
         epsilon = 0.9,
         gamma = 0.9,
         target_replace_iter = 100,
-        memory_capacity = 2000,
+        replay_memory_size = 2000,
         output_graph = True
     )
 
@@ -63,8 +63,7 @@ if __name__ == "__main__":
             agent.store_transition(observation, action, reward, observation_)
 
             # Learn from experience
-            if agent.memory_counter > agent.memory_capacity:
-                agent.learn()
+            agent.learn()
 
             # Swap observations
             observation = observation_
