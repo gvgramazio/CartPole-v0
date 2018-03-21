@@ -18,7 +18,7 @@ if __name__ == "__main__":
     #env = env.unwrapped # To access inner variables like x_threshold and theta_threshold_radians
 
     # Record the video
-    directory = 'video/'
+    directory = 'videos/'
     env = gym.wrappers.Monitor(env, directory, force=True)
 
     # New agent
@@ -71,3 +71,5 @@ if __name__ == "__main__":
             if done:
                 print 'Ep: {0:3d} steps: {1:3d} score: {2:4.2f}'.format(i_episode, t, score)
                 break
+
+    agent.save('models/model.ckpt')

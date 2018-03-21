@@ -16,7 +16,9 @@ class DQNAgent:
         replay_memory_size = 2000,
         output_graph = False,
         run_time_stats = False, # True has no effect if output_graph == False
-        run_time_stats_period = 100
+        run_time_stats_period = 100,
+        restore_tf_variables = False,
+        restore_tf_variables_path = "models/model.ckpt" # Has no effect if restore_tf_variables == False
         ):
         ''' Hyper parameters '''
         self.n_actions = n_actions
@@ -82,6 +84,14 @@ class DQNAgent:
                 self.run_time_stats_period = run_time_stats_period
 
         self.sess.run(tf.global_variables_initializer())
+
+        # Add op to save and restore all the variables.
+        self.saver = tf.train.Saver()
+
+        # Restore variables from disk.
+        if restore_tf_variables == True:
+            self.saver.restore(self.sess, restore_tf_variables_path)
+
 
     def choose_action(self, s):
         s = s[np.newaxis, :]
@@ -157,3 +167,7 @@ class DQNAgent:
         ''' Helper function to show the hyper parameters '''
         for key, value in self.params.items():
             print key, '=', value
+
+    def save(self, path):
+        save_path = self.saver.save(self.sess, path)
+        print 'Model saved in path:', save_path
