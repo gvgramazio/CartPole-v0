@@ -14,7 +14,9 @@ class DQNAgent:
         gamma = 0.9,
         target_replace_iter = 100,
         replay_memory_size = 2000,
-        output_graph = False
+        output_graph = False,
+        run_time_stats = False, # True has no effect if output_graph == False
+        run_time_stats_period = 100
         ):
         ''' Hyper parameters '''
         self.n_actions = n_actions
@@ -74,8 +76,10 @@ class DQNAgent:
         if output_graph:
             # $ tensorboard --logdir=logs
             tf.summary.scalar('loss', loss)
-            self.summary_op = tf.summary.merge_all()
+            self.merger_op = tf.summary.merge_all()
             self.writer = tf.summary.FileWriter("logs/", self.sess.graph)
+            if run_time_stats:
+                self.run_time_stats_period = run_time_stats_period
 
         self.sess.run(tf.global_variables_initializer())
 
@@ -104,6 +108,7 @@ class DQNAgent:
         # Update target net
         self.update_target()
 
+        # Collect a random batch of D
         batch_size = min(len(self.D), self.batch_size)
         batch_indeces = np.random.randint(0, len(self.D), batch_size)
         batch_observation = deque(maxlen=batch_size)
@@ -126,12 +131,27 @@ class DQNAgent:
             if batch_done[j]:
                 batch_q_target[j] = batch_reward[j]
 
-        _, summary = self.sess.run([self.train_op, self.summary_op], {
-            self.observation: batch_observation,
-            self.action: batch_action,
-            self.reward: batch_reward,
-            self.observation_: batch_observation_})
-        self.writer.add_summary(summary, self.learning_step_counter)
+        # Train and store summary
+        if hasattr(self, 'run_time_stats_period') and self.learning_step_counter % self.run_time_stats_period == self.run_time_stats_period-1: # Record execution stats
+            run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+            run_metadata = tf.RunMetadata()
+            _, summary = self.sess.run(
+                [self.train_op, self.merger_op], {
+                    self.observation: batch_observation,
+                    self.action: batch_action,
+                    self.reward: batch_reward,
+                    self.observation_: batch_observation_},
+                options=run_options,
+                run_metadata=run_metadata)
+            self.writer.add_run_metadata(run_metadata, 'step%03d' % self.learning_step_counter)
+            self.writer.add_summary(summary, self.learning_step_counter)
+        else: # Record a summary
+            _, summary = self.sess.run([self.train_op, self.merger_op], {
+                self.observation: batch_observation,
+                self.action: batch_action,
+                self.reward: batch_reward,
+                self.observation_: batch_observation_})
+            self.writer.add_summary(summary, self.learning_step_counter)
 
     def show_parameters(self):
         ''' Helper function to show the hyper parameters '''
